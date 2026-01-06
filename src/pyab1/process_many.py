@@ -2,9 +2,8 @@ import sys
 import argparse
 from Bio import SeqIO
 import polars as pl
-from typing import List, Dict, Any
+from typing import Dict, Any
 
-# Import necessary functions and constants from process.py
 from pyab1.process import (
     BASE_CHANNELS,
     BASES,
@@ -29,7 +28,8 @@ def analyze_abi_file_silent(
         allow_ambiguous (bool): Whether to allow IUPAC ambiguous codes
 
     Returns:
-        dict: Analysis results including trace intensities for positions after pattern matches
+        dict: Analysis results including trace intensities for positions after
+        pattern matches
     """
     record = SeqIO.read(filename, "abi")
     raw = record.annotations["abif_raw"]
@@ -41,13 +41,18 @@ def analyze_abi_file_silent(
     left_trim_count = str(record.seq).find(trimmed_seq)
 
     if left_trim_count == -1:
-        raise ValueError(f"Could not find the PBAS1 sequence from {filename!r} in the Bio SeqRecord!")
+        raise ValueError(
+            f"Could not find the PBAS1 sequence from {filename!r} in the Bio SeqRecord!"
+        )
 
     # Look for the pattern in the trimmed sequence
     positions = find_sequence_positions(trimmed_seq, search_pattern, allow_ambiguous)
 
     if not positions:
-        raise ValueError(f"Pattern {search_pattern!r} could not be found in the trimmed sequence of {filename!r}")
+        raise ValueError(
+            f"Pattern {search_pattern!r} could not be found in the trimmed sequence "
+            f"of {filename!r}"
+        )
 
     peak_locations = raw["PLOC1"]
     trace_data = dict((base, raw[channel]) for base, channel in BASE_CHANNELS.items())
@@ -77,7 +82,10 @@ def analyze_abi_file_silent(
 
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Process multiple AB1 files and generate Excel summary of nucleotide intensities."
+        description=(
+            "Process multiple AB1 files and generate Excel summary of nucleotide "
+            "intensities."
+        )
     )
 
     parser.add_argument(
@@ -121,7 +129,6 @@ def main():
 
     all_results = []
 
-    # Process each AB1 file
     for ab1_file in args.ab1_files:
         try:
             result = analyze_abi_file_silent(
@@ -131,10 +138,10 @@ def main():
                 allow_ambiguous=args.allow_ambiguous,
             )
 
-            # Check if pattern appears multiple times
             if result["match_count"] > 1:
                 print(
-                    f"WARNING: Pattern '{args.pattern}' found {result['match_count']} times in {ab1_file}",
+                    f"WARNING: Pattern '{args.pattern}' found {result['match_count']} "
+                    f"times in {ab1_file}",
                     file=sys.stderr,
                 )
 
@@ -154,28 +161,32 @@ def main():
             continue
 
     if not all_results:
-        print("ERROR: No results to write. No files were successfully processed.", file=sys.stderr)
+        print(
+            "ERROR: No results to write. No files were successfully processed.",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
-    # Create DataFrame
     df = pl.DataFrame(all_results)
 
-    # Calculate summary row
-    summary_row = pl.DataFrame([{
-        "Filename": "TOTAL",
-        "G": df["G"].sum(),
-        "A": df["A"].sum(),
-        "T": df["T"].sum(),
-        "C": df["C"].sum(),
-    }])
+    summary_row = pl.DataFrame(
+        [
+            {
+                "Filename": "TOTAL",
+                "G": df["G"].sum(),
+                "A": df["A"].sum(),
+                "T": df["T"].sum(),
+                "C": df["C"].sum(),
+            }
+        ]
+    )
 
     # Combine data with summary
     df_with_summary = pl.concat([df, summary_row])
 
-    # Write to Excel
     df_with_summary.write_excel(args.output)
 
-    print(f"Successfully processed {len(args.ab1_files)} file(s)")
+    print(f"Processed {len(args.ab1_files)} file(s)")
     print(f"Results written to {args.output}")
 
 

@@ -18,6 +18,12 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/pyab1"]
 
+[dependency-groups]
+dev = [
+    "basedpyright>=1.37.0",
+    "ruff>=0.14.10",
+]
+
 [project.scripts]
 process = "pyab1.process:main"
 process-many = "pyab1.process_many:main"

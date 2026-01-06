@@ -3,7 +3,6 @@ from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
 import numpy as np
 import matplotlib.pyplot as plt
-from collections import Counter
 import re
 import argparse
 from typing import Iterable
@@ -82,15 +81,15 @@ def get_args() -> argparse.Namespace:
 
 def find_sequence_positions(sequence: str, search_pattern: str, allow_ambiguous: bool):
     """
-    Find all positions where a search pattern occurs in the sequence
+    Find all positions where a search pattern occurs in a sequence.
 
     Args:
-        sequence (str): The DNA sequence to search
-        search_pattern (str): The pattern to search for (supports IUPAC codes)
-        allow_ambiguous (bool): Whether to allow ambiguous nucleotides in search
+        sequence: The uppercase DNA sequence to search.
+        search_pattern: The uppercase pattern to search for (supports IUPAC codes).
+        allow_ambiguous: Whether to allow ambiguous nucleotides in search.
 
     Returns:
-        list: List of starting positions (0-indexed) where pattern is found
+        list: List of starting positions (0-indexed) where pattern is found.
     """
     positions = []
 
@@ -110,14 +109,13 @@ def find_sequence_positions(sequence: str, search_pattern: str, allow_ambiguous:
             "N": "[ACGT]",
         }
 
-        pattern = search_pattern.upper()
+        pattern = search_pattern
         for code, regex in iupac_dict.items():
             pattern = pattern.replace(code, regex)
 
-        for match in re.finditer(pattern, str(sequence).upper()):
+        for match in re.finditer(pattern, sequence.upper()):
             positions.append(match.start())
     else:
-        search_pattern = search_pattern.upper()
         sequence_str = sequence.upper()
 
         for i in range(len(sequence_str) - len(search_pattern) + 1):
@@ -140,9 +138,9 @@ def get_trace_data_at_position(
     Get trace data at a specific sequence position
 
     Args:
-        record: BioPython SeqRecord from ABI file
-        position (int): Sequence position (0-indexed)
-        window (int): Window around position to analyze
+        record: BioPython SeqRecord from ABI file.
+        position: Sequence position (0-indexed).
+        window: Window around position to analyze.
 
     Returns:
         dict: Trace intensities and frequencies
@@ -198,30 +196,29 @@ def analyze_abi_file(
     Complete analysis workflow using BioPython
 
     Args:
-        filename (str): Path to ABI file
-        search_pattern (str): DNA sequence pattern to search for
-        allow_ambiguous (bool): Whether to allow IUPAC ambiguous codes
+        filename: Path to ABI file.
+        search_pattern: The uppercase DNA sequence pattern to search for.
+        allow_ambiguous: Whether to allow IUPAC ambiguous codes.
 
     Returns:
         dict: Complete analysis results
     """
     print(f"Reading ABI file: {filename!r}")
     record = SeqIO.read(filename, "abi")
+    record.seq = record.seq.upper()
     raw = record.annotations["abif_raw"]
 
     # Check that the nucleotide order in the file channels is as we have it in BASES.
     assert raw["FWO_1"] == b"".join(bytes(b, "ASCII") for b in BASES)
 
-    trimmed_seq = record.annotations["abif_raw"]["PBAS1"].decode("utf-8")
-    left_trim_count = str(record.seq).find(trimmed_seq)
+    trimmed_seq = record.annotations["abif_raw"]["PBAS1"].decode("utf-8").upper()
+    left_trim_count = record.seq.find(trimmed_seq)
     right_trim_count = len(record.seq) - len(trimmed_seq) - left_trim_count
 
     if left_trim_count == -1:
         sys.exit(
             f"Could not find the PBAS1 sequence from {filename!r} in the Bio SeqRecord!"
         )
-
-    # print("xxx", len(record.letter_annotations['phred_quality']))
 
     print(f"Sequence ID: {record.id}")
     print(f"Sequence length: {len(record.seq)}")
@@ -388,28 +385,9 @@ def plot_chromatogram(
         print("Peak location data not available for plotting")
 
 
-def get_sequence_statistics(record):
-    """Get basic sequence statistics"""
-    sequence = str(record.seq).upper()
-
-    counts = Counter(sequence)
-    total = len(sequence)
-
-    stats = {
-        "length": total,
-        "counts": dict(counts),
-        "frequencies": {base: count / total for base, count in counts.items()},
-    }
-
-    gc_count = counts.get("G", 0) + counts.get("C", 0)
-    stats["gc_content"] = gc_count / total if total > 0 else 0
-
-    return stats
-
-
 def main():
     args = get_args()
-    pattern = args.pattern
+    pattern = args.pattern.upper()
     results = analyze_abi_file(
         args.ab1,
         pattern,
@@ -417,13 +395,6 @@ def main():
         allow_ambiguous=args.allow_ambiguous,
         include_pattern=args.include_pattern,
     )
-
-    # Get sequence statistics
-    # stats = get_sequence_statistics(results["record"])
-    # print(f"\nSequence Statistics:")
-    # print(f"  Length: {stats['length']}")
-    # print(f"  GC Content: {stats['gc_content']:.3f}")
-    # print(f"  Base counts: {stats['counts']}")
 
     if args.plot_qualities:
         plot_quality_scores(
